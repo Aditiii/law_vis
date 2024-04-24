@@ -1,0 +1,27 @@
+/* tableStyles.css */
+.green-cell {
+    background-color: rgb(129, 198, 129) !important;
+}
+
+.no-padding-row {
+    height: auto !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+.no-padding-cell {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+
+.MuiDataGrid-root .MuiDataGrid-cell {
+    padding: 0 0px;
+}
+
+.bold-header {
+    font-weight: bold !important;
+}
+
+.bold-row {
+    font-weight: bold !important;
+}
