@@ -59,8 +59,7 @@ const TableComponent = () => {
     const onSelectionChanged = (event) => {
     
         const selectedRows = event.api.getSelectedRows();
-        console.log("Selected Rows:", selectedRows);
-        console.log('Selection changed');
+        console.log(selectedRows);
     };
 
     return (
