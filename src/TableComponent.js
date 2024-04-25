@@ -1,9 +1,12 @@
-import React from 'react';
-import { DataGrid } from '@mui/x-data-grid';
+import React, { useRef } from 'react';
+import { AgGridReact } from 'ag-grid-react';
+import 'ag-grid-community/styles/ag-grid.css';
+import 'ag-grid-community/styles/ag-theme-alpine.css';
 import jsonData from './data.json';
 import './tableStyles.css';
 
 const TableComponent = () => {
+    const gridApiRef = useRef(null);
     const tableData = Object.entries(jsonData).map(([law, states]) => {
         return {
             id: law,
@@ -12,38 +15,74 @@ const TableComponent = () => {
         };
     });
 
-    const columns = [
-        { field: 'law', headerName: 'Laws', width: 400, headerClassName: 'bold-header' },
-        ...Object.keys(jsonData[tableData[0].law]).map(state => ({
-            field: state,
+    const columnDefs = [
+        {
+            headerName: '',
+            field: 'checkbox',
+            checkboxSelection: true,
+            headerCheckboxSelection: true,
+            width: 35,
+            cellStyle: {marginLeft: 17},
+            pinned: 'left'
+        },
+        { 
+            headerName: 'Laws', 
+            field: 'law',
+            width: 300, 
+            cellStyle: {textAlign: 'left', marginLeft: 18},
+            pinned: 'left',
+            filter: true
+        },
+            ...Object.keys(jsonData[tableData[0].law]).map(state => ({
             headerName: state,
-            renderCell: (params) => {
-                const value = params.value;
-                return <div className={value === 1 ? 'green-cell' : ''}>{value}</div>;
+            field: state,
+            // cellClass: params => {
+            //     return params.value === 1 ? 'green-cell' : '';
+            // },
+            cellRenderer: params => {
+                return params.value === 1 ? <div className="green-cell" style={{width: '100%', height: '100%'}}></div> : '';
             },
-            width: 0.01
+            filter: true,
+            width: 75
         }))
     ];
 
-    const rowClassRules = {
-        'bold-row': (params) => params.id === tableData[0].id
+    // const rowClassRules = {
+       
+    // };
+
+    const handleCluster = () => {
+        // Add clustering logic here
+        console.log('Cluster button clicked');
+    };
+
+    const onSelectionChanged = (event) => {
+    
+        const selectedRows = event.api.getSelectedRows();
+        console.log("Selected Rows:", selectedRows);
+        console.log('Selection changed');
     };
 
     return (
-        <div style={{ height: '50%', overflow: 'auto' }}> {/* Set the height and overflow properties */}
-            <div style={{ height: '70%', width: '100%' }}>
-                <DataGrid
-                    rows={tableData}
-                    columns={columns}
-                    checkboxSelection
-                    getRowClassName={(params) => 'no-padding-row'}
-                    getCellClassName={(params) => 'no-padding-cell'}
-                    rowClassRules={rowClassRules}
+        <div>
+            <div style={{ textAlign: 'center', margin: '20px 0' }}>
+                <button type="button" className="btn btn-dark" onClick={handleCluster}>Cluster</button>
+            </div>
+            <div className="ag-theme-alpine" style={{ height: '650px', width: '97%',paddingLeft: '3%' }}>
+                <AgGridReact
+                    rowData={tableData}
+                    columnDefs={columnDefs}
+                    enableFilter={true}
+                    rowSelection='multiple'
+                    rowMultiSelectWithClick = {true}
+                    onSelectionChanged={onSelectionChanged}
+                    onGridReady={(params) => {
+                        gridApiRef.current = params.api;
+                    }}
                 />
             </div>
         </div>
     );
 };
-
 
 export default TableComponent;

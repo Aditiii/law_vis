@@ -3,6 +3,11 @@
     background-color: rgb(129, 198, 129) !important;
 }
 
+.ag-cell {
+    padding: 0 !important;
+    /* border: 0 !important; */
+}
+
 .no-padding-row {
     height: auto !important;
     padding-top: 0 !important;
