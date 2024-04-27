@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
@@ -33,6 +33,7 @@ let cd7 = {"goodsam-law": "Does the jurisdiction have a drug overdose Good Samar
 const TableComponent = () => {
     let selectedRows = [];
     const gridApiRef = useRef(null);
+    const [isSelectionEnabled, setIsSelectionEnabled] = useState(true);
     const tableData = Object.entries(jsonData).map(([law, states]) => {
         return {
             id: law,
@@ -58,7 +59,6 @@ const TableComponent = () => {
             cellStyle: {textAlign: 'left', marginLeft: 18},
             pinned: 'left',
             filter: true,
-            tooltipShowDelay: 0,
             tooltipValueGetter: (params) => {
                 const lawKey = params.value;
                 return cd7[lawKey] || 'Law description not found';
@@ -79,12 +79,7 @@ const TableComponent = () => {
         }))
     ];
 
-    // const rowClassRules = {
-       
-    // };
-
     const handleCluster = () => {
-        // Add clustering logic here
         console.log('Cluster button clicked');
         const url = 'http://localhost:8000/process-grid';
         if (selectedRows.length !== 0) {
@@ -100,6 +95,26 @@ const TableComponent = () => {
             .then(data => {
                 console.log('POST request successful');
                 console.log(data);
+                const selectedData = data.selectedRows;
+                const remainingRows = tableData.filter(row => !selectedData.some(selectedRow => selectedRow.id === row.id));
+
+                // Add a selected property to each row
+                selectedData.forEach(row => {
+                    row.selected = true;
+                });
+
+                // Update the table data with selected rows on top and remaining rows below
+                const updatedData = [...selectedData, ...remainingRows];
+
+                // Set the updated data to the grid
+                gridApiRef.current.setRowData(updatedData);
+
+                // Select the rows in the grid
+                gridApiRef.current.forEachNode(node => {
+                    if (node.data.selected) {
+                        node.setSelected(true);
+                    }
+                });
             })
             .catch(error => {
                 console.error('Error making POST request:', error);
@@ -107,6 +122,15 @@ const TableComponent = () => {
         }
 
     };
+
+    const handleReset = () => {
+        selectedRows = [];
+        if (gridApiRef.current) {
+            gridApiRef.current.setFilterModel(null);
+            // gridApiRef.current.setSortModel([]);
+            gridApiRef.current.setRowData(tableData);
+        }
+    }
 
     const onSelectionChanged = (event) => {
         selectedRows = event.api.getSelectedRows();
@@ -116,8 +140,9 @@ const TableComponent = () => {
     return (
         <div>
             <div className="row justify-content-center">
-                <div style={{ textAlign: 'center', margin: '1vh' }}>
+                <div style={{ textAlign: 'center', margin: '1vh'}}>
                     <button type="button" className="btn btn-dark" onClick={handleCluster}>Cluster</button>
+                    <button type="button" className="btn btn-dark" onClick={handleReset} style={{ marginLeft: '1vh'}}>Reset</button>
                 </div>
             </div>
             <div className="row justify-content-center">
