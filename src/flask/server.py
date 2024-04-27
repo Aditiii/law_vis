@@ -14,16 +14,6 @@ def process_grid():
     print("In process grid")
     print(data)
     try:
-        result = {}
-        for item in data:
-            result[item["id"]] = {key: value for key, value in item.items() if key != "id"}
-        print(result)
-        result = {}
-        for item in data:
-            result[item["id"]] = {key: value for key, value in item.items() if key != "id"}
-
-        print(result)
-
         # Assuming the first element in each row array is the row label
         row_labels = [row[0] for row in data['rows']]
         data_only = [row[1:] for row in data['rows']]
