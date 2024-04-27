@@ -6,6 +6,7 @@ import jsonData from './data.json';
 import './tableStyles.css';
 
 const TableComponent = () => {
+    let selectedRows = [];
     const gridApiRef = useRef(null);
     const tableData = Object.entries(jsonData).map(([law, states]) => {
         return {
@@ -54,11 +55,30 @@ const TableComponent = () => {
     const handleCluster = () => {
         // Add clustering logic here
         console.log('Cluster button clicked');
+        const url = 'http://localhost:8000/process-grid';
+        if (selectedRows.length !== 0) {
+            const requestBody = { selectedRows };
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('POST request successful');
+                console.log(data);
+            })
+            .catch(error => {
+                console.error('Error making POST request:', error);
+            });
+        }
+
     };
 
     const onSelectionChanged = (event) => {
-    
-        const selectedRows = event.api.getSelectedRows();
+        selectedRows = event.api.getSelectedRows();
         console.log(selectedRows);
     };
 
