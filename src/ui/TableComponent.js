@@ -138,9 +138,10 @@ const TableComponent = () => {
                     return !Object.keys(sortedData).includes(e.id);
                 })
                 const temp = []
-                remainingRows.map((entry)=> {
+                remainingRows.forEach((entry) => {
                     temp.push(entry.id);
-                })
+                });
+                
                 setRemainingIds(temp);
                 rowData = [...rowData, ...remainingRows];
                 setDisplayData(rowData);
