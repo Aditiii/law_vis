@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
@@ -32,55 +32,83 @@ let cd7 = {"goodsam-law": "Does the jurisdiction have a drug overdose Good Samar
 
 const TableComponent = () => {
     let selectedRows = [];
+    const [displayData, setDisplayData] = useState([]);
+    const [tableData, setTableData] = useState([]);
     const gridApiRef = useRef(null);
-    const [isSelectionEnabled, setIsSelectionEnabled] = useState(true);
-    const tableData = Object.entries(jsonData).map(([law, states]) => {
-        return {
-            id: law,
-            law,
-            ...states
-        };
-    });
+    const [columnDefs, setColumnDefs] = useState([]);
+    const [remainingIds, setRemainingIds] = useState([]);
+    useEffect(()=> {
+        const temp = Object.entries(jsonData).map(([law, states]) => {
+            return {
+                id: law,
+                law,
+                ...states
+            };
+        });
+        setTableData(temp);
+    }, []) 
 
-    const columnDefs = [
-        {
-            headerName: '',
-            field: 'checkbox',
-            checkboxSelection: true,
-            headerCheckboxSelection: true,
-            width: 35,
-            cellStyle: {marginLeft: 17},
-            pinned: 'left'
-        },
-        { 
-            headerName: 'Laws', 
-            field: 'law',
-            width: '300vw', 
-            cellStyle: {textAlign: 'left', marginLeft: 18},
-            pinned: 'left',
-            filter: true,
-            tooltipValueGetter: (params) => {
-                const lawKey = params.value;
-                return cd7[lawKey] || 'Law description not found';
-            }
-        },
-            ...Object.keys(jsonData[tableData[0].law]).map(state => ({
-            headerName: state,
-            field: state,
-            // cellClass: params => {
-            //     return params.value === 1 ? 'green-cell' : '';
-            // },
-            cellRenderer: params => {
-                return params.value === 1 ? <div className="green-cell" style={{width: '100%', height: '100%'}}></div> : '';
-            },
-            filter: true,
-            width: 47,
-            headerClass: 'Hello'
-        }))
-    ];
+    useEffect(()=> {
+        if(tableData && tableData.length > 0) {
+            setDisplayData(tableData);
+        }
+    }, [tableData]) 
+
+    useEffect(() => {
+        
+        if(displayData && displayData.length > 0) {
+            const cols = Object.keys(displayData[0]).slice(2,-1);
+            const temp = [
+                {
+                    headerName: '',
+                    field: 'checkbox',
+                    checkboxSelection: true,
+                    headerCheckboxSelection: true,
+                    width: 35,
+                    cellStyle: {marginLeft: 17},
+                    pinned: 'left',
+                    showDisabledCheckboxes: true
+                },
+                { 
+                    headerName: 'Laws', 
+                    field: 'law',
+                    width: '300vw', 
+                    cellStyle: {textAlign: 'left', marginLeft: 18},
+                    pinned: 'left',
+                    filter: true,
+                    tooltipValueGetter: (params) => {
+                        const lawKey = params.value;
+                        return cd7[lawKey] || 'Law description not found';
+                    }
+                },
+                    ...cols.map(state => ({
+                    
+                    headerName: state,
+                    field: state,
+                    // cellClass: params => {
+                    //     return params.value === 1 ? 'green-cell' : '';
+                    // },
+                    cellRenderer: params => {
+                        return params.value === 1 ? <div className="green-cell" style={{width: '100%', height: '100%'}}></div> : '';
+                    },
+                    filter: true,
+                    width: 47,
+                    headerClass: 'Hello'
+                }))
+            ];
+            setColumnDefs(temp);
+        
+            gridApiRef.current.forEachNode(node => {
+                if (node.data.selected) {
+                    node.setSelected(true);
+                } else {
+
+                }
+            });
+        }
+    }, [displayData])
 
     const handleCluster = () => {
-        console.log('Cluster button clicked');
         const url = 'http://localhost:8000/process-grid';
         if (selectedRows.length !== 0) {
             const requestBody = { selectedRows };
@@ -93,28 +121,29 @@ const TableComponent = () => {
             })
             .then(response => response.json())
             .then(data => {
-                console.log('POST request successful');
-                console.log(data);
-                const selectedData = data.selectedRows;
-                const remainingRows = tableData.filter(row => !selectedData.some(selectedRow => selectedRow.id === row.id));
+                const sortedData = JSON.parse(data.sorted_dataframe);
+                let rowData = Object.keys(sortedData).map(key => {
+                    return {
+                        id: key,
+                        law: key,
+                        ...sortedData[key]
+                    };
+                });
 
-                // Add a selected property to each row
-                selectedData.forEach(row => {
+                rowData.forEach(row => {
                     row.selected = true;
                 });
 
-                // Update the table data with selected rows on top and remaining rows below
-                const updatedData = [...selectedData, ...remainingRows];
-
-                // Set the updated data to the grid
-                gridApiRef.current.setRowData(updatedData);
-
-                // Select the rows in the grid
-                gridApiRef.current.forEachNode(node => {
-                    if (node.data.selected) {
-                        node.setSelected(true);
-                    }
-                });
+                const remainingRows = tableData.filter((e)=>{
+                    return !Object.keys(sortedData).includes(e.id);
+                })
+                const temp = []
+                remainingRows.map((entry)=> {
+                    temp.push(entry.id);
+                })
+                setRemainingIds(temp);
+                rowData = [...rowData, ...remainingRows];
+                setDisplayData(rowData);
             })
             .catch(error => {
                 console.error('Error making POST request:', error);
@@ -124,40 +153,47 @@ const TableComponent = () => {
     };
 
     const handleReset = () => {
+        setRemainingIds([]);
         selectedRows = [];
         if (gridApiRef.current) {
             gridApiRef.current.setFilterModel(null);
             // gridApiRef.current.setSortModel([]);
-            gridApiRef.current.setRowData(tableData);
+            setDisplayData(tableData);
         }
     }
 
     const onSelectionChanged = (event) => {
         selectedRows = event.api.getSelectedRows();
-        console.log(selectedRows);
     };
 
     return (
         <div>
             <div className="row justify-content-center">
                 <div style={{ textAlign: 'center', margin: '1vh'}}>
-                    <button type="button" className="btn btn-dark" onClick={handleCluster}>Cluster</button>
+                <button type="button" className="btn btn-dark" onClick={handleCluster}>Cluster</button>
                     <button type="button" className="btn btn-dark" onClick={handleReset} style={{ marginLeft: '1vh'}}>Reset</button>
                 </div>
             </div>
             <div className="row justify-content-center">
                 <div className="ag-theme-alpine" style={{ height: '92vh', width: '97%'}}>
-                    <AgGridReact
-                        rowData={tableData}
-                        columnDefs={columnDefs}
-                        enableFilter={true}
-                        rowSelection='multiple'
-                        rowMultiSelectWithClick = {true}
-                        onSelectionChanged={onSelectionChanged}
-                        onGridReady={(params) => {
-                            gridApiRef.current = params.api;
-                        }}
-                    />
+                <AgGridReact
+                    rowData={displayData}
+                    columnDefs={columnDefs}
+                    enableFilter={true}
+                    rowSelection='multiple'
+                    rowMultiSelectWithClick = {true}
+                    onSelectionChanged={onSelectionChanged}
+                    onGridReady={(params) => {
+                        gridApiRef.current = params.api;
+                    }}
+                    isRowSelectable= {(params)=>{
+                        if(remainingIds.includes(params.data.id)) {
+                            return false
+                        } else {
+                            return true
+                        }
+                    }}
+                />
                 </div>
             </div>
         </div>
