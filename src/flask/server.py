@@ -45,6 +45,7 @@ def process_grid():
         # # Get sorted indices (order of labels in the sorted DataFrame)
         # sorted_row_indices = list(df.index)
         # sorted_column_indices = list(df.columns)
+        fit_data=fit_data.replace(0.01,0)
         sorted_df_json = fit_data.to_json(orient='index')
         return jsonify({'sorted_dataframe': sorted_df_json})
     except Exception as e:
