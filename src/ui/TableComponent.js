@@ -37,6 +37,8 @@ const TableComponent = () => {
     const gridApiRef = useRef(null);
     const [columnDefs, setColumnDefs] = useState([]);
     const [remainingIds, setRemainingIds] = useState([]);
+    const [showAlert, setShowAlert] = useState(false);
+
     useEffect(()=> {
         const temp = Object.entries(jsonData).map(([law, states]) => {
             return {
@@ -109,6 +111,11 @@ const TableComponent = () => {
     }, [displayData])
 
     const handleCluster = () => {
+        if (selectedRows.length < 2) {
+            setShowAlert(true);
+            setTimeout(() => {
+                setShowAlert(false);
+            }, 3000);}
         const url = 'http://localhost:8000/process-grid';
         if (selectedRows.length !== 0) {
             const requestBody = { selectedRows };
@@ -141,7 +148,7 @@ const TableComponent = () => {
                 remainingRows.forEach((entry) => {
                     temp.push(entry.id);
                 });
-                
+
                 setRemainingIds(temp);
                 rowData = [...rowData, ...remainingRows];
                 setDisplayData(rowData);
@@ -169,11 +176,16 @@ const TableComponent = () => {
 
     return (
         <div>
+            {showAlert && <div className="alert alert-warning" role="alert" >
+                {/* style={{marginLeft: '3vh', marginRight: '3vh'}}> */}
+                Please select at least 2 rows for clustering!
+            </div>}
             <div className="row justify-content-center">
                 <div style={{ textAlign: 'center', margin: '1vh'}}>
-                <button type="button" className="btn btn-dark" onClick={handleCluster}>Cluster</button>
+                    <button type="button" className="btn btn-dark" onClick={handleCluster}>Cluster</button>
                     <button type="button" className="btn btn-dark" onClick={handleReset} style={{ marginLeft: '1vh'}}>Reset</button>
                 </div>
+               
             </div>
             <div className="row justify-content-center">
                 <div className="ag-theme-alpine" style={{ height: '92vh', width: '97%'}}>
