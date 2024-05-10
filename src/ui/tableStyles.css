@@ -8,6 +8,21 @@
     /* border: 0 !important; */
 }
 
+/* CSS */
+.ag-header-cell .ag-header-cell-menu-button {
+    display: none; /* Hide filter icon by default */
+    padding: 0;
+}
+
+.ag-header-cell:hover .ag-header-cell-menu-button {
+    display: block; /* Show filter icon on hover */
+    padding: 0;
+}
+
+.ag-header-cell.Hello {
+    padding: 0.5%;
+}
+
 .no-padding-row {
     height: auto !important;
     padding-top: 0 !important;
