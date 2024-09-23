@@ -90,9 +90,9 @@ const TableComponent = () => {
                     // cellClass: params => {
                     //     return params.value === 1 ? 'green-cell' : '';
                     // },
-                    cellRenderer: params => {
-                        return params.value === 1 ? <div className="green-cell" style={{width: '100%', height: '100%'}}></div> : '';
-                    },
+                    // cellRenderer: params => {
+                    //     return params.value === 1 ? <div className="green-cell" style={{width: '100%', height: '100%'}}></div> : '';
+                    // },
                     filter: true,
                     width: 47,
                     headerClass: 'Hello'
@@ -159,6 +159,55 @@ const TableComponent = () => {
         }
 
     };
+    const handleFlood = () => {
+        if (selectedRows.length < 2) {
+            setShowAlert(true);
+            setTimeout(() => {
+                setShowAlert(false);
+            }, 3000);}
+        const url = 'http://localhost:8000/flood-fill-route';
+        if (selectedRows.length !== 0) {
+            const requestBody = { selectedRows };
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
+            })
+            .then(response => response.json())
+            .then(data => {
+                const sortedData = JSON.parse(data.sorted_dataframe);
+                let rowData = Object.keys(sortedData).map(key => {
+                    return {
+                        id: key,
+                        law: key,
+                        ...sortedData[key]
+                    };
+                });
+
+                rowData.forEach(row => {
+                    row.selected = true;
+                });
+
+                const remainingRows = tableData.filter((e)=>{
+                    return !Object.keys(sortedData).includes(e.id);
+                })
+                const temp = []
+                remainingRows.forEach((entry) => {
+                    temp.push(entry.id);
+                });
+
+                setRemainingIds(temp);
+                rowData = [...rowData, ...remainingRows];
+                setDisplayData(rowData);
+            })
+            .catch(error => {
+                console.error('Error making POST request:', error);
+            });
+        }
+
+    };
 
     const handleReset = () => {
         setRemainingIds([]);
@@ -183,6 +232,7 @@ const TableComponent = () => {
             <div className="row justify-content-center">
                 <div style={{ textAlign: 'center', margin: '1vh'}}>
                     <button type="button" className="btn btn-dark" onClick={handleCluster}>Cluster</button>
+                    <button type="button" className="btn btn-dark" onClick={handleFlood}>Flood-fill</button>
                     <button type="button" className="btn btn-dark" onClick={handleReset} style={{ marginLeft: '1vh'}}>Reset</button>
                 </div>
                
