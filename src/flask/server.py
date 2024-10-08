@@ -1,11 +1,176 @@
 from flask import Flask, request, jsonify
 import pandas as pd
 from flask_cors import CORS, cross_origin
-from sklearn.cluster import SpectralBiclustering
 import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
+from sklearn.cluster import SpectralCoclustering
+from sklearn.cluster import SpectralBiclustering
+from sklearn.cluster import AgglomerativeClustering
+
+
 app = Flask(__name__)
 CORS(app)
 app.config['CORS_HEADERS'] = 'Content-Type'
+
+
+
+
+def rearrange_matrix_by_ones(matrix):
+
+    # Step 1: Compute the sum of 1's in each row
+    row_sums = np.sum(matrix, axis=1)  # Sum of 1's per row
+
+    # Step 2: Sort rows based on the sum of 1's (descending order)
+    sorted_row_idx_by_ones = np.argsort(-row_sums)  # Sort in descending order (more 1's first)
+
+    # Step 3: Rearrange the matrix rows based on this sorting
+    sorted_matrix = matrix[sorted_row_idx_by_ones, :]
+
+    # Step 4: Compute the sum of 1's in each column of the sorted matrix
+    col_sums = np.sum(sorted_matrix, axis=0)  # Sum of 1's per column
+
+    # Step 5: Sort columns based on the sum of 1's (descending order)
+    sorted_col_idx_by_ones = np.argsort(-col_sums)  # Sort in descending order (more 1's first)
+
+    # Step 6: Rearrange the sorted matrix columns based on this sorting
+    sorted_matrix = sorted_matrix[:, sorted_col_idx_by_ones]
+
+
+    return sorted_matrix, sorted_row_idx_by_ones, sorted_col_idx_by_ones
+
+
+
+def rearrange_matrix_by_ones_and_clustering(matrix, n_clusters=2):
+
+    # Step 1: Compute the sum of 1's in each row
+    row_sums = np.sum(matrix, axis=1)  # Sum of 1's per row
+
+    # Step 2: Sort rows based on the sum of 1's (descending order)
+    sorted_row_idx_by_ones = np.argsort(-row_sums)  # Sort in descending order (more 1's first)
+
+    # Step 3: Rearrange the matrix rows based on this sorting
+    sorted_matrix = matrix[sorted_row_idx_by_ones, :]
+
+    # Step 4: Compute the sum of 1's in each column of the sorted matrix
+    col_sums = np.sum(sorted_matrix, axis=0)  # Sum of 1's per column
+
+    # Step 5: Sort columns based on the sum of 1's (descending order)
+    sorted_col_idx_by_ones = np.argsort(-col_sums)  # Sort in descending order (more 1's first)
+
+    # Step 6: Rearrange the sorted matrix columns based on this sorting
+    sorted_matrix = sorted_matrix[:, sorted_col_idx_by_ones]
+
+    # Step 7: Apply agglomerative clustering on the rows
+    row_clustering = AgglomerativeClustering(n_clusters=n_clusters, metric='jaccard', linkage='complete').fit(sorted_matrix)
+    sorted_row_idx_by_clustering = np.argsort(row_clustering.labels_)
+    clustered_matrix = sorted_matrix[sorted_row_idx_by_clustering, :]
+
+    # Step 8: Apply agglomerative clustering on the columns (transpose to cluster columns as rows)
+    col_clustering = AgglomerativeClustering(n_clusters=n_clusters, metric='jaccard', linkage='complete').fit(clustered_matrix.T)
+    sorted_col_idx_by_clustering = np.argsort(col_clustering.labels_)
+    clustered_matrix = clustered_matrix[:, sorted_col_idx_by_clustering]
+
+    return clustered_matrix, sorted_row_idx_by_clustering, sorted_col_idx_by_clustering
+
+
+
+
+#rearrange_matrix_by_ones_and_clustering(sorted_data_kmeans, 6)
+
+
+
+
+def rearrange_matrix_by_ones_and_kmeans(matrix, n_clusters=2):
+
+    # Step 1: Compute the sum of 1's in each row
+    row_sums = np.sum(matrix, axis=1)
+
+    # Step 2: Sort rows based on the sum of 1's
+    sorted_row_idx_by_ones = np.argsort(-row_sums)
+    sorted_matrix = matrix[sorted_row_idx_by_ones, :]
+
+    # Step 3: Sort columns based on the sum of 1's
+    col_sums = np.sum(sorted_matrix, axis=0)
+    sorted_col_idx_by_ones = np.argsort(-col_sums)
+    sorted_matrix = sorted_matrix[:, sorted_col_idx_by_ones]
+
+    # Step 4: Apply KMeans clustering on the rows (set n_init explicitly)
+    row_clustering = KMeans(n_clusters=n_clusters, n_init=10).fit(sorted_matrix)
+    sorted_row_idx_by_clustering = np.argsort(row_clustering.labels_)
+    clustered_matrix = sorted_matrix[sorted_row_idx_by_clustering, :]
+
+    # Step 5: Apply KMeans clustering on the columns (set n_init explicitly)
+    col_clustering = KMeans(n_clusters=n_clusters, n_init=10).fit(clustered_matrix.T)
+    sorted_col_idx_by_clustering = np.argsort(col_clustering.labels_)
+    clustered_matrix = clustered_matrix[:, sorted_col_idx_by_clustering]
+    return clustered_matrix,sorted_row_idx_by_clustering, sorted_col_idx_by_clustering
+
+
+
+# Example usage
+#rearrange_matrix_by_ones_and_kmeans(sorted_data_kmeans, 6)
+
+
+
+def rearrange_matrix_by_spectral_co_clustering(matrix, n_clusters=2):
+
+    # Step 1: Compute the sum of 1's in each row
+    row_sums = np.sum(matrix, axis=1)
+    sorted_row_idx_by_ones = np.argsort(-row_sums)
+    sorted_matrix = matrix[sorted_row_idx_by_ones, :]
+
+    # Step 2: Sort columns based on the sum of 1's
+    col_sums = np.sum(sorted_matrix, axis=0)
+    sorted_col_idx_by_ones = np.argsort(-col_sums)
+    sorted_matrix = sorted_matrix[:, sorted_col_idx_by_ones]
+
+    # Step 3: Apply Spectral Co-clustering
+    co_clustering = SpectralCoclustering(n_clusters=n_clusters, random_state=0).fit(sorted_matrix)
+    sorted_row_idx_by_clustering = np.argsort(co_clustering.row_labels_)
+    clustered_matrix = sorted_matrix[sorted_row_idx_by_clustering, :]
+
+    sorted_col_idx_by_clustering = np.argsort(co_clustering.column_labels_)
+    clustered_matrix = clustered_matrix[:, sorted_col_idx_by_clustering]
+
+    return clustered_matrix, sorted_row_idx_by_clustering, sorted_col_idx_by_clustering
+
+
+# Example usage
+#rearrange_matrix_by_spectral_co_clustering(sorted_data_kmeans, 6)
+
+
+
+
+def rearrange_matrix_by_spectral_bi_clustering(matrix, n_clusters=2):
+
+    # Step 1: Compute the sum of 1's in each row
+    row_sums = np.sum(matrix, axis=1)
+    sorted_row_idx_by_ones = np.argsort(-row_sums)
+    sorted_matrix = matrix[sorted_row_idx_by_ones, :]
+
+    # Step 2: Sort columns based on the sum of 1's
+    col_sums = np.sum(sorted_matrix, axis=0)
+    sorted_col_idx_by_ones = np.argsort(-col_sums)
+    sorted_matrix = sorted_matrix[:, sorted_col_idx_by_ones]
+
+    # Step 3: Apply Spectral Bi-clustering
+    bi_clustering = SpectralBiclustering(n_clusters=n_clusters, random_state=0).fit(sorted_matrix)
+    sorted_row_idx_by_clustering = np.argsort(bi_clustering.row_labels_)
+    clustered_matrix = sorted_matrix[sorted_row_idx_by_clustering, :]
+
+    sorted_col_idx_by_clustering = np.argsort(bi_clustering.column_labels_)
+    clustered_matrix = clustered_matrix[:, sorted_col_idx_by_clustering]
+
+    return clustered_matrix, sorted_row_idx_by_clustering, sorted_col_idx_by_clustering
+
+
+# Example usage
+#rearrange_matrix_by_spectral_bi_clustering(sorted_data_kmeans, 6)
+
+
+
 
 @app.route('/process-grid', methods=['POST'])
 @cross_origin()
@@ -20,23 +185,33 @@ def process_grid():
 
         # Create DataFrame using data and excluding the row label from columns
         df = pd.DataFrame(data['selectedRows'])
+        clustering_algo=data.get('cluster','rearrangement')
         # Set 'law' as the index
         df.set_index('law', inplace=True)
         # Remove the 'id' column as it is redundant with 'law'
         df.drop(columns=['id'], inplace=True)
         df=df.replace(0,0.01)
-        model = SpectralBiclustering(n_clusters=2, random_state=0)
-        model.fit(df)
-        print(model.row_labels_)
-        print(model.column_labels_)
-        fit_data = df.iloc[np.argsort(model.row_labels_)]
-        fit_data = fit_data.iloc[:, np.argsort(model.column_labels_)]
-        row_labels_list = model.row_labels_.tolist()
-        column_labels_list = model.column_labels_.tolist()
-        response = {
-        'row_labels': row_labels_list,
-        'column_labels': column_labels_list
-        }
+        matrix=df.values
+        if clustering_algo=='rearrangement':
+            clustered_matrix, sorted_row_idx_by_clustering, sorted_col_idx_by_clustering = rearrange_matrix_by_ones(matrix)
+        elif clustering_algo=='agglomerative_clustering':
+            clustered_matrix, sorted_row_idx_by_clustering, sorted_col_idx_by_clustering = rearrange_matrix_by_ones_and_clustering(matrix, 6)
+        elif clustering_algo=='kmeans_clustering':
+            clustered_matrix, sorted_row_idx_by_clustering, sorted_col_idx_by_clustering = rearrange_matrix_by_ones_and_kmeans(matrix, 6)
+        elif clustering_algo=='spectral_coclustering':
+            clustered_matrix, sorted_row_idx_by_clustering, sorted_col_idx_by_clustering = rearrange_matrix_by_spectral_co_clustering(matrix, 6)
+        elif clustering_algo=='spectral_biclustering':
+            clustered_matrix, sorted_row_idx_by_clustering, sorted_col_idx_by_clustering = rearrange_matrix_by_spectral_bi_clustering(matrix, 6)
+        # print(model.row_labels_)
+        # print(model.column_labels_)
+        # fit_data = df.iloc[np.argsort(model.row_labels_)]
+        # fit_data = fit_data.iloc[:, np.argsort(model.column_labels_)]
+        # row_labels_list = model.row_labels_.tolist()
+        # column_labels_list = model.column_labels_.tolist()
+        # response = {
+        # 'row_labels': row_labels_list,
+        # 'column_labels': column_labels_list
+        # }
 
         # Sorting DataFrame by row and column labels
         #df.sort_index(inplace=True)  # Sort by row labels
@@ -45,6 +220,9 @@ def process_grid():
         # # Get sorted indices (order of labels in the sorted DataFrame)
         # sorted_row_indices = list(df.index)
         # sorted_column_indices = list(df.columns)
+        new_index = df.index[sorted_row_idx_by_clustering]
+        new_columns = df.columns[sorted_col_idx_by_clustering]
+        fit_data = pd.DataFrame(clustered_matrix, columns=new_columns, index=new_index)
         fit_data=fit_data.replace(0.01,0)
         sorted_df_json = fit_data.to_json(orient='index')
         return jsonify({'sorted_dataframe': sorted_df_json})
