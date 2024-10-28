@@ -421,5 +421,49 @@ def flood_fill_route():
 # for row in matrix:
 #     print(row)
 
+# def flood_fill(matrix, x, y, new_color):
+#     rows = len(matrix)
+#     cols = len(matrix[0])
+#     current_color = matrix[x][y]
+
+#     # Create a stack for DFS
+#     stack = [(x, y)]
+    
+#     while stack:
+#         cx, cy = stack.pop()
+        
+#         # Continue if the current cell is already colored correctly
+#         if matrix[cx][cy] != current_color:
+#             continue
+        
+#         # Color the current cell
+#         matrix[cx][cy] = new_color
+        
+#         # Check and add the four adjacent cells if valid
+#         if cx > 0:  # Up
+#             stack.append((cx-1, cy))
+#         if cx < rows - 1:  # Down
+#             stack.append((cx+1, cy))
+#         if cy > 0:  # Left
+#             stack.append((cx, cy-1))
+#         if cy < cols - 1:  # Right
+#             stack.append((cx, cy+1))
+
+# def fill_all_components(matrix,start_number):
+#     rows = len(matrix)
+#     cols = len(matrix[0])
+#     color = start_number  # Start coloring from 10 to clearly differentiate colors in examples
+    
+#     for x in range(rows):
+#         for y in range(cols):
+#             if matrix[x][y] == -2 or matrix[x][y] == -1:  # Assuming original colors are < 10
+#                 flood_fill(matrix, x, y, color)
+#                 color += 10  # Increment the color for the next component
+
+# fill_all_components(matrix,10)
+
+# for row in matrix:
+#     print(row)
+
 if __name__ == '__main__':
     app.run(port=8000, debug=True)
