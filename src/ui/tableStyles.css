@@ -1,4 +1,17 @@
 /* tableStyles.css */
+.Checkbox {
+    padding-left: 15%;
+}
+
+.Laws {
+    padding-left: 5%;
+    padding-right: 5%;
+}
+
+.selected-cell {
+    background-color: rgba(255, 0, 0, 0.5) !important; /* Red background for selected cells */
+}
+
 .green-cell {
     background-color: rgb(129, 198, 129) !important;
 }
@@ -20,7 +33,7 @@
 }
 
 .ag-header-cell.Hello {
-    padding: 0.5%;
+    padding: 0.2%;
 }
 
 .no-padding-row {

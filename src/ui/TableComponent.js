@@ -3,6 +3,7 @@ import { AgGridReact } from 'ag-grid-react';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 import jsonData from './data.json';
+import stateJson from './states.json';
 import './tableStyles.css';
 
 let cd7 = {"goodsam-law": "Does the jurisdiction have a drug overdose Good Samaritan Law?",
@@ -31,13 +32,18 @@ let cd7 = {"goodsam-law": "Does the jurisdiction have a drug overdose Good Samar
 }
 
 const TableComponent = () => {
-    let selectedRows = [];
+    const [selectedRows, setSelectedRows] = useState([]);
     const [displayData, setDisplayData] = useState([]);
     const [tableData, setTableData] = useState([]);
     const gridApiRef = useRef(null);
     const [columnDefs, setColumnDefs] = useState([]);
     const [remainingIds, setRemainingIds] = useState([]);
     const [showAlert, setShowAlert] = useState(false);
+    const [selectedClusteringMethod, setSelectedClusteringMethod] = useState('');
+    
+    const [startCell, setStartCell] = useState(null); // Stores the starting cell for drag selection
+    const [endCell, setEndCell] = useState(null); // Stores the ending cell for drag selection
+    const [selectedCells, setSelectedCells] = useState([]); // Selected cells range
 
     useEffect(()=> {
         const temp = Object.entries(jsonData).map(([law, states]) => {
@@ -57,45 +63,57 @@ const TableComponent = () => {
     }, [tableData]) 
 
     useEffect(() => {
-        
-        if(displayData && displayData.length > 0) {
-            const cols = Object.keys(displayData[0]).slice(2,-1);
+        if(displayData && displayData.length > 0) {            
+            let cols = [];
+            const excludedKeys = ['selected', 'law', 'id']; // Array of keys to exclude
+
+            cols = Object.keys(displayData[0]).filter(key => !excludedKeys.includes(key));
+
             const temp = [
                 {
                     headerName: '',
                     field: 'checkbox',
                     checkboxSelection: true,
                     headerCheckboxSelection: true,
-                    width: 35,
-                    cellStyle: {marginLeft: 17},
+                    width: 10,
+                    cellStyle: {marginLeft: 10},
                     pinned: 'left',
-                    showDisabledCheckboxes: true
+                    showDisabledCheckboxes: true,
+                    headerClass: 'Checkbox'
                 },
                 { 
                     headerName: 'Laws', 
                     field: 'law',
-                    width: '300vw', 
-                    cellStyle: {textAlign: 'left', marginLeft: 18},
+                    width: '45vw', 
+                    cellStyle: {textAlign: 'left', marginLeft: 10},
                     pinned: 'left',
                     filter: true,
                     tooltipValueGetter: (params) => {
                         const lawKey = params.value;
-                        return cd7[lawKey] || 'Law description not found';
-                    }
+                        return cd7[lawKey];
+                    },
+                    headerClass: 'Laws'
                 },
                     ...cols.map(state => ({
-                    
                     headerName: state,
                     field: state,
-                    // cellClass: params => {
-                    //     return params.value === 1 ? 'green-cell' : '';
-                    // },
-                    // cellRenderer: params => {
-                    //     return params.value === 1 ? <div className="green-cell" style={{width: '100%', height: '100%'}}></div> : '';
-                    // },
+                    headerTooltip: stateJson[state],
+                    cellStyle: params => {
+                        const isSelected = selectedCells.some(cell => 
+                          cell.rowIndex === params.rowIndex && cell.colId === params.column.getColId()
+                        );
+                        // if (isSelected) {
+                        //     console.log("true");
+                        // }
+                        return isSelected ? { backgroundColor: 'grey' } : null;
+                    },
+                    cellRenderer: params => {
+                        return params.value === 1 ? <div className="green-cell" style={{width: '100%', height: '100%'}}></div> : '';
+                    },
                     filter: true,
-                    width: 47,
-                    headerClass: 'Hello'
+                    width:18,
+                    headerClass: 'Hello',
+                    // cellClass: getCellClass, // Add the cellClass here
                 }))
             ];
             setColumnDefs(temp);
@@ -108,7 +126,7 @@ const TableComponent = () => {
                 }
             });
         }
-    }, [displayData])
+    }, [displayData, selectedCells])
 
     const handleCluster = () => {
         if (selectedRows.length < 2) {
@@ -118,56 +136,10 @@ const TableComponent = () => {
             }, 3000);}
         const url = 'http://localhost:8000/process-grid';
         if (selectedRows.length !== 0) {
-            const requestBody = { selectedRows };
-            fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(requestBody)
-            })
-            .then(response => response.json())
-            .then(data => {
-                const sortedData = JSON.parse(data.sorted_dataframe);
-                let rowData = Object.keys(sortedData).map(key => {
-                    return {
-                        id: key,
-                        law: key,
-                        ...sortedData[key]
-                    };
-                });
-
-                rowData.forEach(row => {
-                    row.selected = true;
-                });
-
-                const remainingRows = tableData.filter((e)=>{
-                    return !Object.keys(sortedData).includes(e.id);
-                })
-                const temp = []
-                remainingRows.forEach((entry) => {
-                    temp.push(entry.id);
-                });
-
-                setRemainingIds(temp);
-                rowData = [...rowData, ...remainingRows];
-                setDisplayData(rowData);
-            })
-            .catch(error => {
-                console.error('Error making POST request:', error);
-            });
-        }
-
-    };
-    const handleFlood = () => {
-        if (selectedRows.length < 2) {
-            setShowAlert(true);
-            setTimeout(() => {
-                setShowAlert(false);
-            }, 3000);}
-        const url = 'http://localhost:8000/flood-fill-route';
-        if (selectedRows.length !== 0) {
-            const requestBody = { selectedRows };
+            const requestBody = { 
+                selectedRows,
+                cluster: selectedClusteringMethod 
+            };
             fetch(url, {
                 method: 'POST',
                 headers: {
@@ -211,7 +183,9 @@ const TableComponent = () => {
 
     const handleReset = () => {
         setRemainingIds([]);
-        selectedRows = [];
+        setSelectedRows([]);
+        setSelectedCells([]);
+        setSelectedClusteringMethod('');
         if (gridApiRef.current) {
             gridApiRef.current.setFilterModel(null);
             // gridApiRef.current.setSortModel([]);
@@ -220,8 +194,97 @@ const TableComponent = () => {
     }
 
     const onSelectionChanged = (event) => {
-        selectedRows = event.api.getSelectedRows();
+        console.log('In onSelectionChanged');
+        setSelectedRows(event.api.getSelectedRows());
+        // Update selectedCells state based on your selection logic
+        const newSelectedCells = [];
+        selectedRows.forEach(row => {
+            const rowIndex = row.rowIndex; // Assuming rowIndex is part of your data
+            Object.keys(row).forEach(key => {
+                newSelectedCells.push({ rowIndex, colId: key });
+            });
+        });
+        setSelectedCells(newSelectedCells); // Update your selectedCells state
+
+        // Refresh cells to apply new styles based on selection
+        if (gridApiRef.current) {
+            gridApiRef.current.refreshCells();
+        }
     };
+
+    const handleCellClick = (params) => {
+        const { rowIndex, colDef } = params;
+        const colId = colDef.field;
+        // console.log("handleCellClick");
+        setStartCell({ rowIndex, colId });
+        setEndCell(null); // Reset the end cell when a new selection starts
+        setSelectedCells([{ rowIndex, colId }]); // Start with the clicked cell
+    };
+
+    const handleCellMouseOver = (params) => {
+        // console.log("handleCellMouseOver");
+        if (!startCell) return; // Only drag-select if a starting cell has been clicked
+
+        const { rowIndex, colDef } = params;
+        const colId = colDef.field;
+
+        // Set the end cell and select all cells within the rectangle
+        setEndCell({ rowIndex, colId });
+        const newSelectedCells = calculateSelectedCells(startCell, { rowIndex, colId });
+        setSelectedCells(newSelectedCells);
+
+        // Refresh the cells to apply new styles
+        // if (gridApiRef.current) {
+        //     gridApiRef.current.refreshCells({ force: true });
+        // }
+    };
+
+    // Calculate the range of selected cells between startCell and endCell
+    const calculateSelectedCells = (start, end) => {
+        const rows = [start.rowIndex, end.rowIndex].sort((a, b) => a - b); // Min and max row
+        const cols = [start.colId, end.colId]; // Get column names between start and end
+
+        const colIndexes = columnDefs.map((col, index) => ({
+            colId: col.field,
+            index
+        }));
+
+        // Get start and end column indexes
+        const startColIndex = colIndexes.findIndex(col => col.colId === start.colId);
+        const endColIndex = colIndexes.findIndex(col => col.colId === end.colId);
+
+        const colsInRange = colIndexes
+            .slice(Math.min(startColIndex, endColIndex), Math.max(startColIndex, endColIndex) + 1)
+            .map(col => col.colId);
+
+        // Build selected cells range
+        const selectedCells = [];
+        for (let row = rows[0]; row <= rows[1]; row++) {
+            colsInRange.forEach(col => {
+                selectedCells.push({ rowIndex: row, colId: col });
+            });
+        }
+        console.log(selectedCells);
+        return selectedCells;
+    };
+
+    // Handle mouse up to finish the selection
+    const handleMouseUp = () => {
+        setStartCell(null); // Reset start cell after selection is finished
+        setEndCell(null);   // Reset end cell
+
+        // Refresh the cells to apply new styles
+        if (gridApiRef.current) {
+            gridApiRef.current.refreshCells({ force: true });
+        }
+    };
+
+    useEffect(() => {
+        document.addEventListener('mouseup', handleMouseUp);
+        return () => {
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, []);
 
     return (
         <div>
@@ -229,16 +292,30 @@ const TableComponent = () => {
                 {/* style={{marginLeft: '3vh', marginRight: '3vh'}}> */}
                 Please select at least 2 rows for clustering!
             </div>}
-            <div className="row justify-content-center">
-                <div style={{ textAlign: 'center', margin: '1vh'}}>
-                    <button type="button" className="btn btn-dark" onClick={handleCluster}>Cluster</button>
-                    <button type="button" className="btn btn-dark" onClick={handleFlood}>Flood-fill</button>
+                <div className="row justify-content-center">
+                    <div style={{ textAlign: 'center', margin: '1vh'}}>
+                        {/* Dropdown for clustering options */}
+                        <select 
+                            className="form-select" 
+                            aria-label="Clustering Options" 
+                            onChange={(e) => setSelectedClusteringMethod(e.target.value)} 
+                            style={{ display: 'inline-block', width: 'auto' }}
+                            value={selectedClusteringMethod}
+                        >
+                            <option value="">Select Clustering Method</option>
+                            <option value="rearrangement">Rearrangement</option>
+                            <option value="agglomerative_clustering">Agglomerative Clustering</option>
+                            <option value="kmeans_clustering">KMeans Clustering</option>
+                            <option value="spectral_coclustering">Spectral Co-clustering</option>
+                            <option value="spectral_biclustering">Spectral Bi-clustering</option>
+                        </select>
+                    <button type="button" className="btn btn-dark" onClick={handleCluster} style={{ marginLeft: '1vh'}}>Cluster</button>
                     <button type="button" className="btn btn-dark" onClick={handleReset} style={{ marginLeft: '1vh'}}>Reset</button>
                 </div>
                
             </div>
             <div className="row justify-content-center">
-                <div className="ag-theme-alpine" style={{ height: '92vh', width: '97%'}}>
+                <div className="ag-theme-alpine" style={{ height: '92vh', width: '98%'}}>
                 <AgGridReact
                     rowData={displayData}
                     columnDefs={columnDefs}
@@ -246,6 +323,9 @@ const TableComponent = () => {
                     rowSelection='multiple'
                     rowMultiSelectWithClick = {true}
                     onSelectionChanged={onSelectionChanged}
+                    enableBrowserTooltips={true}
+                    onCellMouseDown={handleCellClick}   // Start selection on cell click
+                    onCellMouseOver={handleCellMouseOver}   // Select cells on drag
                     onGridReady={(params) => {
                         gridApiRef.current = params.api;
                     }}
