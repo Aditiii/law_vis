@@ -35,6 +35,9 @@
 .ag-header-cell.Hello {
     padding: 0.2%;
 }
+.ag-theme-alpine .ag-row-selected {
+    background-color: transparent !important;
+  }
 
 .no-padding-row {
     height: auto !important;

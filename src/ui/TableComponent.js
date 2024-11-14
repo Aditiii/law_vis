@@ -76,9 +76,10 @@ const TableComponent = () => {
                     checkboxSelection: true,
                     headerCheckboxSelection: true,
                     width: 10,
-                    cellStyle: {marginLeft: 10},
+                    cellStyle:  {marginLeft: 10},
                     pinned: 'left',
                     showDisabledCheckboxes: true,
+                    suppressRowClickSelection: true,
                     headerClass: 'Checkbox'
                 },
                 { 
@@ -98,17 +99,33 @@ const TableComponent = () => {
                     headerName: state,
                     field: state,
                     headerTooltip: stateJson[state],
-                    cellStyle: params => {
+                    cellStyle: params => {  
                         const isSelected = selectedCells.some(cell => 
                           cell.rowIndex === params.rowIndex && cell.colId === params.column.getColId()
                         );
                         // if (isSelected) {
                         //     console.log("true");
                         // }
-                        return isSelected ? { backgroundColor: 'grey' } : null;
+                        if (isSelected) {
+                            if (params.value === 1) {
+                                return { backgroundColor: 'black' };
+                            }
+                            else{
+                                return { backgroundColor: 'grey'};
+                            }
+                            // White cells remain white when selected
+                            //return {};
+                        }
+                        if (params.value === 1) {
+                            return { backgroundColor: `rgba(255, 0, 0, 0.5)` };
+                          }
+                        else{
+                            return {backgroundColor:'white'};
+                        }
+                          return null;
                     },
                     cellRenderer: params => {
-                        return params.value === 1 ? <div className="green-cell" style={{width: '100%', height: '100%'}}></div> : '';
+                        return params.value === 1 ? <div className="selected-cell" style={{width: '100%', height: '100%'}}></div> : '';
                     },
                     filter: true,
                     width:18,
@@ -207,18 +224,38 @@ const TableComponent = () => {
         setSelectedCells(newSelectedCells); // Update your selectedCells state
 
         // Refresh cells to apply new styles based on selection
-        if (gridApiRef.current) {
-            gridApiRef.current.refreshCells();
-        }
+        // if (gridApiRef.current) {
+        //     const checkboxColumn = gridApiRef.current.getColumnDef('checkbox');
+        //     if (checkboxColumn) {
+        //       gridApiRef.current.refreshCells({
+        //         columns: [checkboxColumn],
+        //         force: true
+        //       });
+        //     }
+        //   }
     };
 
     const handleCellClick = (params) => {
         const { rowIndex, colDef } = params;
         const colId = colDef.field;
         // console.log("handleCellClick");
-        setStartCell({ rowIndex, colId });
-        setEndCell(null); // Reset the end cell when a new selection starts
-        setSelectedCells([{ rowIndex, colId }]); // Start with the clicked cell
+        const isAlreadySelected = selectedCells.some(
+            cell => cell.rowIndex === rowIndex && cell.colId === colId
+          );
+          if (isAlreadySelected) {
+            // If the cell is already selected, remove it from the selection
+            setSelectedCells(prevSelectedCells => 
+              prevSelectedCells.filter(cell => !(cell.rowIndex === rowIndex && cell.colId === colId))
+            );
+          } else {
+            // If the cell is not selected, start a new selection
+            setStartCell({ rowIndex, colId });
+            setEndCell(null);
+            setSelectedCells([{ rowIndex, colId }]);
+          }
+          if (gridApiRef.current) {
+            gridApiRef.current.refreshCells({ force: true });
+          }
     };
 
     const handleCellMouseOver = (params) => {
@@ -231,12 +268,14 @@ const TableComponent = () => {
         // Set the end cell and select all cells within the rectangle
         setEndCell({ rowIndex, colId });
         const newSelectedCells = calculateSelectedCells(startCell, { rowIndex, colId });
-        setSelectedCells(newSelectedCells);
-
-        // Refresh the cells to apply new styles
-        // if (gridApiRef.current) {
-        //     gridApiRef.current.refreshCells({ force: true });
-        // }
+        setSelectedCells(prevSelectedCells => {
+            // Merge the new selection with existing selections
+            return [...new Set([...prevSelectedCells, ...newSelectedCells])];
+          });
+        
+          if (gridApiRef.current) {
+            gridApiRef.current.refreshCells({ force: true });
+          }
     };
 
     // Calculate the range of selected cells between startCell and endCell
@@ -322,10 +361,12 @@ const TableComponent = () => {
                     enableFilter={true}
                     rowSelection='multiple'
                     rowMultiSelectWithClick = {true}
+                    suppressRowClickSelection={true}
                     onSelectionChanged={onSelectionChanged}
                     enableBrowserTooltips={true}
                     onCellMouseDown={handleCellClick}   // Start selection on cell click
                     onCellMouseOver={handleCellMouseOver}   // Select cells on drag
+                    onMouseUp={handleMouseUp}
                     onGridReady={(params) => {
                         gridApiRef.current = params.api;
                     }}
