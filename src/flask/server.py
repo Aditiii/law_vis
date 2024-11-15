@@ -8,7 +8,10 @@ from sklearn.cluster import KMeans
 from sklearn.cluster import SpectralCoclustering
 from sklearn.cluster import SpectralBiclustering
 from sklearn.cluster import AgglomerativeClustering
-
+from sklearn.manifold import MDS
+from scipy.spatial.distance import pdist, squareform
+from ortools.constraint_solver import routing_enums_pb2
+from ortools.constraint_solver import pywrapcp
 
 app = Flask(__name__)
 CORS(app)
@@ -138,7 +141,6 @@ def rearrange_matrix_by_spectral_co_clustering(matrix, n_clusters=2):
 
 
 
-
 def rearrange_matrix_by_spectral_bi_clustering(matrix, n_clusters=2):
 
     # Step 1: Compute the sum of 1's in each row
@@ -162,9 +164,86 @@ def rearrange_matrix_by_spectral_bi_clustering(matrix, n_clusters=2):
     return clustered_matrix, sorted_row_idx_by_clustering, sorted_col_idx_by_clustering
 
 
-# Example usage
-#rearrange_matrix_by_spectral_bi_clustering(sorted_data_kmeans, 6)
+def rearrange_matrix_by_spectral_bi_clustering(matrix, n_clusters=2):
 
+    # Step 1: Compute the sum of 1's in each row
+    row_sums = np.sum(matrix, axis=1)
+    sorted_row_idx_by_ones = np.argsort(-row_sums)
+    sorted_matrix = matrix[sorted_row_idx_by_ones, :]
+
+    # Step 2: Sort columns based on the sum of 1's
+    col_sums = np.sum(sorted_matrix, axis=0)
+    sorted_col_idx_by_ones = np.argsort(-col_sums)
+    sorted_matrix = sorted_matrix[:, sorted_col_idx_by_ones]
+
+    # Step 3: Apply Spectral Bi-clustering
+    bi_clustering = SpectralBiclustering(n_clusters=n_clusters, random_state=0).fit(sorted_matrix)
+    sorted_row_idx_by_clustering = np.argsort(bi_clustering.row_labels_)
+    clustered_matrix = sorted_matrix[sorted_row_idx_by_clustering, :]
+
+    sorted_col_idx_by_clustering = np.argsort(bi_clustering.column_labels_)
+    clustered_matrix = clustered_matrix[:, sorted_col_idx_by_clustering]
+
+    return clustered_matrix, sorted_row_idx_by_clustering, sorted_col_idx_by_clustering
+
+def solve_tsp(dist_matrix):
+    num_points = len(dist_matrix)
+    
+    # Create the routing index manager and model
+    manager = pywrapcp.RoutingIndexManager(num_points, 1, 0)
+    routing = pywrapcp.RoutingModel(manager)
+
+    # Define the distance callback
+    def distance_callback(from_index, to_index):
+        return int(dist_matrix[manager.IndexToNode(from_index)][manager.IndexToNode(to_index)])
+
+    transit_callback_index = routing.RegisterTransitCallback(distance_callback)
+    routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
+
+    # Setting up parameters for TSP
+    search_parameters = pywrapcp.DefaultRoutingSearchParameters()
+    search_parameters.first_solution_strategy = (
+        routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC)
+    search_parameters.local_search_metaheuristic = (
+        routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH)
+    search_parameters.time_limit.seconds = 30
+
+    # Solve the TSP
+    solution = routing.SolveWithParameters(search_parameters)
+
+    # Retrieve the path
+    if solution:
+        path = []
+        index = routing.Start(0)
+        while not routing.IsEnd(index):
+            path.append(manager.IndexToNode(index))
+            index = solution.Value(routing.NextVar(index))
+        return path
+    else:
+        return None
+
+def mds_and_rearrangement(matrix):
+    # Step 1: Compute row (law) correlation matrix and apply MDS
+    row_correlation_matrix = matrix.T.corr()
+    row_correlation_matrix = row_correlation_matrix.fillna(0)
+    mds = MDS(n_components=2, dissimilarity='precomputed', random_state=42)
+    row_mds_coords = mds.fit_transform(1 - row_correlation_matrix)  # Using (1 - correlation) as distance
+
+    # Step 2: Solve TSP on rows based on MDS coordinates
+    row_dist_matrix = squareform(pdist(row_mds_coords))
+    row_order = solve_tsp(row_dist_matrix)
+    if row_order:
+        tsp_df = matrix.iloc[row_order]  # Reorder rows
+    print(row_order)
+    # Step 4: Compute the sum of 1's in each column of the sorted matrix
+    col_sums = np.sum(tsp_df.values, axis=0)  # Sum of 1's per column
+
+    # Step 5: Sort columns based on the sum of 1's (descending order)
+    sorted_col_idx_by_ones = np.argsort(-col_sums)  # Sort in descending order (more 1's first)
+    print(sorted_col_idx_by_ones)
+    # Step 6: Rearrange the sorted matrix columns based on this sorting
+    tsp_df = tsp_df.iloc[:, sorted_col_idx_by_ones]
+    return tsp_df, row_order, sorted_col_idx_by_ones
 
 @app.route('/process-grid', methods=['POST'])
 @cross_origin()
@@ -195,7 +274,9 @@ def process_grid():
         elif clustering_algo=='spectral_coclustering':
             clustered_matrix, sorted_row_idx_by_clustering, sorted_col_idx_by_clustering = rearrange_matrix_by_spectral_co_clustering(matrix, 6)
         elif clustering_algo=='spectral_biclustering':
-            clustered_matrix, sorted_row_idx_by_clustering, sorted_col_idx_by_clustering = rearrange_matrix_by_spectral_bi_clustering(matrix, 6)
+            clustered_matrix, sorted_row_idx_by_clustering, sorted_col_idx_by_clustering = rearrange_matrix_by_spectral_bi_clustering(matrix, 6) 
+        elif clustering_algo=='mds':
+            clustered_matrix, sorted_row_idx_by_clustering, sorted_col_idx_by_clustering = mds_and_rearrangement(df)
         # print(model.row_labels_)
         # print(model.column_labels_)
         # fit_data = df.iloc[np.argsort(model.row_labels_)]

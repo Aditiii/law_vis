@@ -347,6 +347,7 @@ const TableComponent = () => {
                             <option value="kmeans_clustering">KMeans Clustering</option>
                             <option value="spectral_coclustering">Spectral Co-clustering</option>
                             <option value="spectral_biclustering">Spectral Bi-clustering</option>
+                            <option value="mds">MDS + Rearrangement</option>
                         </select>
                     <button type="button" className="btn btn-dark" onClick={handleCluster} style={{ marginLeft: '1vh'}}>Cluster</button>
                     <button type="button" className="btn btn-dark" onClick={handleReset} style={{ marginLeft: '1vh'}}>Reset</button>
