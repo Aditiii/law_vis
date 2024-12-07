@@ -4,6 +4,7 @@ import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 import jsonData from './data.json';
 import stateJson from './states.json';
+import DateSlider from './DateSlider.js';
 import './tableStyles.css';
 
 let cd7 = {"goodsam-law": "Does the jurisdiction have a drug overdose Good Samaritan Law?",
@@ -28,6 +29,7 @@ let cd7 = {"goodsam-law": "Does the jurisdiction have a drug overdose Good Samar
   "goodsam-mitigation": "Is reporting an overdose considered a mitigating factor in sentencing?",
   "goodsam-mit-type_Controlled substances offenses": "For what types of crimes is mitigation permitted? Controlled substances offenses.",
   "goodsam-mit-type_Alcohol-related offenses": "For what types of crimes is mitigation permitted? Alcohol-related offenses.",
+  "temp":"Very random data added.",
   "goodsam-mit-type_Other offenses beyond controlled substances and alcohol-related violations": "For what types of crimes is mitigation permitted? Other offenses beyond controlled substances and alcohol-related violations."
 }
 
@@ -44,24 +46,68 @@ const TableComponent = () => {
     const [startCell, setStartCell] = useState(null); // Stores the starting cell for drag selection
     const [endCell, setEndCell] = useState(null); // Stores the ending cell for drag selection
     const [selectedCells, setSelectedCells] = useState([]); // Selected cells range
+    const [selectedDate, setSelectedDate] = useState(new Date('2021-08-01').getTime());
 
-    useEffect(()=> {
-        const temp = Object.entries(jsonData).map(([law, states]) => {
-            return {
-                id: law,
-                law,
-                ...states
-            };
+    // useEffect(()=> {
+    //     const temp = Object.entries(jsonData).map(([law, states]) => {
+    //         const processedStates = {};
+    //         Object.entries(states).forEach(([state, data]) => {
+    //           processedStates[state] = data[data.length - 1].status; // Get the last status
+    //         });
+    //           return {
+    //             id: law,
+    //             law,
+    //             ...processedStates 
+    //         };
+    //     });
+    //     setTableData(temp);
+    // }, []) 
+
+    // useEffect(()=> {
+    //     if(tableData && tableData.length > 0) {
+    //         setDisplayData(tableData);
+    //     }
+    // }, [tableData]) 
+    useEffect(() => {
+        const processData = (jsonData, date) => {
+          return Object.entries(jsonData).map(([law, states]) => {
+            const processedStates = {};
+            Object.entries(states).forEach(([state, data]) => {
+              const applicableStatus = data.find(item => 
+                new Date(item.from) <= date && 
+                (!item.to || new Date(item.to) > date)
+              );
+              processedStates[state] = applicableStatus ? applicableStatus.status : data[data.length - 1].status;
+            });
+            return { id: law, law, ...processedStates };
+          });
+        };
+      
+        const initialDate = new Date('2025-01-01');
+        const initialData = processData(jsonData, initialDate);
+        setTableData(initialData);
+        setDisplayData(initialData);
+      }, []);
+
+
+      const processData = (jsonData, date) => {
+        return Object.entries(jsonData).map(([law, states]) => {
+          const processedStates = {};
+          Object.entries(states).forEach(([state, data]) => {
+            const applicableStatus = data.find(item => 
+              new Date(item.from) <= date && 
+              (!item.to || new Date(item.to) > date)
+            );
+            processedStates[state] = applicableStatus ? applicableStatus.status : data[data.length - 1].status;
+          });
+          return { id: law, law, ...processedStates };
         });
-        setTableData(temp);
-    }, []) 
-
-    useEffect(()=> {
-        if(tableData && tableData.length > 0) {
-            setDisplayData(tableData);
-        }
-    }, [tableData]) 
-
+      };
+      const handleDateChange = (newDate) => {
+        setSelectedDate(newDate);
+        const updatedData = processData(jsonData, newDate);
+        setDisplayData(updatedData);
+      };
     useEffect(() => {
         if(displayData && displayData.length > 0) {            
             let cols = [];
@@ -355,6 +401,11 @@ const TableComponent = () => {
             </div>
             <div className="row justify-content-center">
                 <div className="ag-theme-alpine" style={{ height: '92vh', width: '98%'}}>
+                <DateSlider 
+        minDate={new Date('2000-01-01').getTime()}
+        maxDate={new Date('2025-01-01').getTime()}
+        onDateChange={handleDateChange}
+      />
                 <AgGridReact
                     rowData={displayData}
                     columnDefs={columnDefs}
