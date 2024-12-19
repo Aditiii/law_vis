@@ -2,9 +2,14 @@ import React, { useRef, useState, useEffect } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
-import jsonData from './data.json';
-import stateJson from './states.json';
+import goodSam from './datasets/goodSam.json';
+import dirDisp from './datasets/dirDisp.json';
+import naloxoneOverdosePrev from './datasets/naloxoneOverdosePrev.json';
+import sspUpdate2021 from './datasets/sspUpdate2021.json';
+import stateJson from './datasets/states.json';
 import './tableStyles.css';
+import 'bootstrap-icons/font/bootstrap-icons.css';
+import DateSlider from './DateSlider';
 
 let cd7 = {"goodsam-law": "Does the jurisdiction have a drug overdose Good Samaritan Law?",
   "goodsam-cs_Arrest": "What protection, if any, does the law provide from controlled substance possession laws? Arrest.",
@@ -32,6 +37,16 @@ let cd7 = {"goodsam-law": "Does the jurisdiction have a drug overdose Good Samar
 }
 
 const TableComponent = () => {
+    const optionsData = [
+        { id: 'goodSam', value: 'goodSam', label: 'Good Samaritan Overdose Prevention Laws' },
+        { id: 'directDisp', value: 'directDisp', label: 'Direct Dispensing Stat' },
+        { id: 'naloxoneOverdosePrev', value: 'naloxoneOverdosePrev', label: 'Naloxone Overdose Prevention Laws' },
+        { id: 'sspUpdate2021', value: 'sspUpdate2021', label: 'SSP Update 2021' },
+        // Add more options here
+    ];
+
+    const [combinedData, setCombinedData] = useState([]);
+
     const [selectedRows, setSelectedRows] = useState([]);
     const [displayData, setDisplayData] = useState([]);
     const [tableData, setTableData] = useState([]);
@@ -45,22 +60,26 @@ const TableComponent = () => {
     const [endCell, setEndCell] = useState(null); // Stores the ending cell for drag selection
     const [selectedCells, setSelectedCells] = useState([]); // Selected cells range
 
-    useEffect(()=> {
-        const temp = Object.entries(jsonData).map(([law, states]) => {
-            return {
-                id: law,
-                law,
-                ...states
-            };
-        });
-        setTableData(temp);
-    }, []) 
+    // multiple db changes
+    const [isPanelOpen, setIsPanelOpen] = React.useState(false);
+    const [isFilterPanelOpen, setIsFilterPanelOpen] = React.useState(false);
+    const [selectedOptions, setSelectedOptions] = React.useState(['goodSam']);
 
-    useEffect(()=> {
-        if(tableData && tableData.length > 0) {
-            setDisplayData(tableData);
-        }
-    }, [tableData]) 
+    //date slider
+    const [selectedDate, setSelectedDate] = useState(new Date('2021-08-01').getTime());
+
+    const processData = (jsonData, date, source) => {
+        return Object.entries(jsonData).map(([law, states]) => {
+          const processedStates = {};
+          Object.entries(states).forEach(([state, data]) => {
+            const applicableStatus = data.find(item => 
+              new Date(item.from) <= date && (!item.to || new Date(item.to) > date)
+            );
+            processedStates[state] = applicableStatus ? applicableStatus.status : data[data.length - 1].status;
+          });
+          return { id: law, law, ...processedStates,  datasetSource: source };
+        });
+    };
 
     useEffect(() => {
         if(displayData && displayData.length > 0) {            
@@ -75,12 +94,14 @@ const TableComponent = () => {
                     field: 'checkbox',
                     checkboxSelection: true,
                     headerCheckboxSelection: true,
-                    width: 10,
-                    cellStyle:  {marginLeft: 10},
+                    width: 50,
+                    minWidth: 50,
+                    maxWidth: 50,
                     pinned: 'left',
-                    showDisabledCheckboxes: true,
-                    suppressRowClickSelection: true,
-                    headerClass: 'Checkbox'
+                    lockPosition: true,
+                    suppressMovable: true,
+                    cellStyle: { display: 'flex', justifyContent: 'center', alignItems: 'center' },
+                    headerClass: 'ag-checkbox-header custom-checkbox-header'
                 },
                 { 
                     headerName: 'Laws', 
@@ -94,6 +115,14 @@ const TableComponent = () => {
                         return cd7[lawKey];
                     },
                     headerClass: 'Laws'
+                },
+                { 
+                    headerName: 'Source', 
+                    field: 'datasetSource',
+                    width: '45vw', 
+                    cellStyle: {textAlign: 'left', marginLeft: 10},
+                    pinned: 'left',
+                    filter: true
                 },
                     ...cols.map(state => ({
                     headerName: state,
@@ -122,7 +151,6 @@ const TableComponent = () => {
                         else{
                             return {backgroundColor:'white'};
                         }
-                          return null;
                     },
                     cellRenderer: params => {
                         return params.value === 1 ? <div className="selected-cell" style={{width: '100%', height: '100%'}}></div> : '';
@@ -145,6 +173,102 @@ const TableComponent = () => {
         }
     }, [displayData, selectedCells])
 
+    useEffect(() => {
+        if (combinedData && combinedData.length > 0) {
+          let cols = [];
+          const excludedKeys = ['selected', 'law', 'id'];
+          cols = Object.keys(combinedData[0]).filter(key => !excludedKeys.includes(key));
+          
+          const temp = [
+            // ... existing columns ...
+            {
+              headerName: 'Dataset Source',
+              field: 'datasetSource',
+              width: 150,
+              filter: true,
+              headerClass: 'DatasetSource'
+            },
+            // ... other columns ...
+          ];
+          
+          setColumnDefs(temp);
+        }
+    }, [combinedData]);
+    
+    useEffect(() => {
+        const initialDate = new Date('2025-01-01');
+        // const initialData = Object.entries(goodSam).map(([law, states]) => ({
+        //   ...states,
+        //   id: law,
+        //   law,
+        //   datasetSource: 'Good Samaritan Overdose Prevention Laws'
+        // }));
+        const idata = processData(goodSam, initialDate, 'Good Samaritan Overdose Prevention Laws')
+        setTableData(idata);
+        setDisplayData(idata);
+        setSelectedDate(initialDate.getTime());
+      }, []);
+    
+      const getDataForOption = (option) => {
+        switch(option) {
+          case 'goodSam':
+            return goodSam; // Assuming jsonData is your Good Samaritan data
+          case 'directDisp':
+            return dirDisp; // Other data sources
+          case 'naloxoneOverdosePrev':
+            return naloxoneOverdosePrev;
+          case 'sspUpdate2021':
+            return sspUpdate2021;
+          default:
+            return {};
+        }
+      };
+      
+    const handleOptionChange = (e) => {
+        const value = e.target.value;
+        setSelectedOptions(prev => {
+          const newSelection = prev.includes(value) ? prev.filter(opt => opt !== value) : [...prev, value];
+          if (!prev.includes(value)) {
+            let newData;
+            let source;
+            switch (value) {
+              case 'goodSam':
+                source = 'Good Samaritan Overdose Prevention Laws';
+                newData = processData(goodSam, selectedDate, source);
+                break;
+              case 'directDisp':
+                source = 'Direct Dispensing Stat';
+                newData = processData(dirDisp, selectedDate, source);
+                break;
+              case 'naloxoneOverdosePrev':
+                source = 'Naloxone Overdose Prevention Laws';
+                newData = processData(naloxoneOverdosePrev, selectedDate, source);
+                break;
+              case 'sspUpdate2021':
+                source = 'SSP Update 2021';
+                newData = processData(sspUpdate2021, selectedDate, source);
+                break;
+              default:
+                break;
+            }
+            setDisplayData(prevData => [...prevData, ...newData]);
+          } else {
+            setDisplayData(prevData => prevData.filter(item => item.datasetSource !== optionsData.find(opt => opt.value === value).label));
+          }
+          return newSelection;
+        });
+    };
+
+    const handleDateChange = (newDate) => {
+        setSelectedDate(newDate);
+        const updatedData = selectedOptions.flatMap(option => {
+          const sourceData = getDataForOption(option);
+          return processData(sourceData, newDate, option+' data');
+        });
+        
+        setDisplayData(updatedData);
+    };
+    
     const handleCluster = () => {
         if (selectedRows.length < 2) {
             setShowAlert(true);
@@ -202,7 +326,9 @@ const TableComponent = () => {
         setRemainingIds([]);
         setSelectedRows([]);
         setSelectedCells([]);
+        setSelectedOptions(['goodSam']);
         setSelectedClusteringMethod('');
+        setSelectedDate([new Date('2021-08-01').getTime()])
         if (gridApiRef.current) {
             gridApiRef.current.setFilterModel(null);
             // gridApiRef.current.setSortModel([]);
@@ -303,7 +429,7 @@ const TableComponent = () => {
                 selectedCells.push({ rowIndex: row, colId: col });
             });
         }
-        console.log(selectedCells);
+        //console.log(selectedCells);
         return selectedCells;
     };
 
@@ -326,63 +452,111 @@ const TableComponent = () => {
     }, []);
 
     return (
-        <div>
-            {showAlert && <div className="alert alert-warning" role="alert" >
-                {/* style={{marginLeft: '3vh', marginRight: '3vh'}}> */}
-                Please select at least 2 rows for clustering!
-            </div>}
-                <div className="row justify-content-center">
-                    <div style={{ textAlign: 'center', margin: '1vh'}}>
-                        {/* Dropdown for clustering options */}
-                        <select 
-                            className="form-select" 
-                            aria-label="Clustering Options" 
-                            onChange={(e) => setSelectedClusteringMethod(e.target.value)} 
-                            style={{ display: 'inline-block', width: 'auto' }}
-                            value={selectedClusteringMethod}
-                        >
-                            <option value="">Select Clustering Method</option>
-                            <option value="rearrangement">Rearrangement</option>
-                            <option value="agglomerative_clustering">Agglomerative Clustering</option>
-                            <option value="kmeans_clustering">KMeans Clustering</option>
-                            <option value="spectral_coclustering">Spectral Co-clustering</option>
-                            <option value="spectral_biclustering">Spectral Bi-clustering</option>
-                            <option value="mds">MDS + Rearrangement</option>
-                        </select>
-                    <button type="button" className="btn btn-dark" onClick={handleCluster} style={{ marginLeft: '1vh'}}>Cluster</button>
-                    <button type="button" className="btn btn-dark" onClick={handleReset} style={{ marginLeft: '1vh'}}>Reset</button>
-                </div>
-               
+<div className="container-fluid" style={{marginTop: '10px'}}>
+  <div className="row align-items-center mb-3">
+    <div className="col-auto">
+      <button className="btn btn-light" type="button" onClick={() => setIsPanelOpen(!isPanelOpen)}>
+        <i className="bi bi-list" style={{ fontSize: '1.5rem' }}></i>
+      </button>
+    </div>
+    <div className="col">
+      <select className="form-select" aria-label="Clustering Options" onChange={(e) => setSelectedClusteringMethod(e.target.value)} value={selectedClusteringMethod}>
+        <option value="">Select Clustering Method</option>
+        <option value="rearrangement">Rearrangement</option>
+        <option value="agglomerative_clustering">Agglomerative Clustering</option>
+        <option value="kmeans_clustering">KMeans Clustering</option>
+        <option value="spectral_coclustering">Spectral Co-clustering</option>
+        <option value="spectral_biclustering">Spectral Bi-clustering</option>
+        <option value="mds">MDS + Rearrangement</option>
+      </select>
+    </div>
+    <div className="col-auto">
+      <button type="button" className="btn btn-dark me-2" onClick={handleCluster}>Cluster</button>
+      <button type="button" className="btn btn-dark me-2" onClick={handleReset}>Reset</button>
+      <button className="btn btn-light" type="button" onClick={() => setIsFilterPanelOpen(!isFilterPanelOpen)}>
+        <i className="bi bi-funnel" style={{ fontSize: '1.5rem' }}></i>
+      </button>
+    </div>
+  </div>
+  
+  <div className="row">
+    {isPanelOpen && (
+      <div className="col-auto border p-2" style={{ minWidth: '250px', maxWidth: '300px', marginLeft: '10px'}}>
+        <h6>Datasets</h6>
+        <div className="dataset-options">
+          {optionsData.map((option) => (
+            <div key={option.id} className="form-check mb-2">
+              <input
+                className="form-check-input"
+                type="checkbox"
+                value={option.value}
+                id={option.id}
+                onChange={handleOptionChange}
+                checked={selectedOptions.includes(option.value)}
+              />
+              <label className="form-check-label" htmlFor={option.id}>
+                {option.label}
+              </label>
             </div>
-            <div className="row justify-content-center">
-                <div className="ag-theme-alpine" style={{ height: '92vh', width: '98%'}}>
-                <AgGridReact
-                    rowData={displayData}
-                    columnDefs={columnDefs}
-                    enableFilter={true}
-                    rowSelection='multiple'
-                    rowMultiSelectWithClick = {true}
-                    suppressRowClickSelection={true}
-                    onSelectionChanged={onSelectionChanged}
-                    enableBrowserTooltips={true}
-                    onCellMouseDown={handleCellClick}   // Start selection on cell click
-                    onCellMouseOver={handleCellMouseOver}   // Select cells on drag
-                    onMouseUp={handleMouseUp}
-                    onGridReady={(params) => {
-                        gridApiRef.current = params.api;
-                    }}
-                    isRowSelectable= {(params)=>{
-                        if(remainingIds.includes(params.data.id)) {
-                            return false
-                        } else {
-                            return true
-                        }
-                    }}
-                />
-                </div>
-            </div>
+          ))}
         </div>
-    );
+      </div>
+    )}
+    
+    <div className={`col ${isPanelOpen ? 'ps-3' : ''} ${isFilterPanelOpen ? 'pe-3' : ''}`}>
+      {showAlert && <div className="alert alert-warning" role="alert">Please select at least 2 rows for clustering!</div>}
+      <div className="ag-theme-alpine" style={{ height: '92vh', width: '100%' }}>
+        <AgGridReact
+          rowData={displayData}
+          columnDefs={columnDefs}
+          enableFilter={true}
+          rowSelection="multiple"
+          rowMultiSelectWithClick={true}
+          suppressRowClickSelection={true}
+          onSelectionChanged={onSelectionChanged}
+          enableBrowserTooltips={true}
+          onCellMouseDown={handleCellClick}
+          onCellMouseOver={handleCellMouseOver}
+          onMouseUp={handleMouseUp}
+          onGridReady={(params) => {
+            gridApiRef.current = params.api;
+          }}
+          isRowSelectable={(params) => !remainingIds.includes(params.data.id)}
+        />
+      </div>
+    </div>
+
+    {isFilterPanelOpen && (
+      <div className="col-auto border p-2" style={{ minWidth: '250px', maxWidth: '300px', marginRight: '10px' }}>
+        <h6>Date Filter</h6>
+        <DateSlider 
+            minDate={new Date('2000-01-01').getTime()}
+            maxDate={new Date('2025-01-01').getTime()}
+            onDateChange={handleDateChange}
+            value={selectedDate}
+        />
+        {/* <div className="filter-options">
+          {filterOptions.map((filter) => (
+            <div key={filter.id} className="form-check mb-2">
+              <input
+                className="form-check-input"
+                type="checkbox"
+                value={filter.value}
+                id={filter.id}
+                // onChange={}
+                // checked={selectedFilters.includes(filter.value)}
+              />
+              <label className="form-check-label" htmlFor={filter.id}>
+                {filter.label}
+              </label>
+            </div>
+          ))}
+        </div> */}
+      </div>
+    )}
+  </div>
+</div>
+  );
 };
 
 export default TableComponent;

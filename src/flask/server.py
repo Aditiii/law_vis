@@ -259,10 +259,12 @@ def process_grid():
         # Create DataFrame using data and excluding the row label from columns
         df = pd.DataFrame(data['selectedRows'])
         clustering_algo=data.get('cluster','rearrangement')
+        dataset_source = df['datasetSource']
+
         # Set 'law' as the index
         df.set_index('law', inplace=True)
         # Remove the 'id' column as it is redundant with 'law'
-        df.drop(columns=['id'], inplace=True)
+        df.drop(columns=['id', 'datasetSource'], inplace=True)
         df=df.replace(0,0.01)
         matrix=df.values
         if clustering_algo=='rearrangement':
@@ -299,6 +301,8 @@ def process_grid():
         new_columns = df.columns[sorted_col_idx_by_clustering]
         fit_data = pd.DataFrame(clustered_matrix, columns=new_columns, index=new_index)
         fit_data=fit_data.replace(0.01,0)
+        # Add the datasetSource column back to the DataFrame
+        fit_data['datasetSource'] = dataset_source[sorted_row_idx_by_clustering].values
         sorted_df_json = fit_data.to_json(orient='index')
         return jsonify({'sorted_dataframe': sorted_df_json})
     except Exception as e:
